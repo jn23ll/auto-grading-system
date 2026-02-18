@@ -1,6 +1,10 @@
 streamlit
 pandas
 numpy
-psycopg2-binary
+opencv-python-headless
 Pillow
-openpyxl
+psycopg2-binary
+sqlalchemy
+easyocr
+torch
+torchvision
