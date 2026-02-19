@@ -1,6 +1,7 @@
 import streamlit as st
 import cv2
 import numpy as np
+import os
 import psycopg2
 import torch
 import pandas as pd
@@ -17,11 +18,8 @@ if "logged_in" not in st.session_state:
 # ================= CONNECT DB =================
 def connect_db():
     return psycopg2.connect(
-        host="localhost",
-        database="grading_db",
-        user="postgres",
-        password="saedahlyp23.",
-        port="5432"
+        os.environ["DATABASE_URL"],
+        sslmode="require"
     )
 
 # ================= ANSWER KEY =================
