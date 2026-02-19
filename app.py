@@ -170,16 +170,30 @@ def ocr_page():
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
         results={}; score=0
+
         for i in range(1,11):
-            roi = gray[600+i*200:750+i*200,1600:2200]
+
+            # ⭐ ตำแหน่ง ROI ใหม่ (ลองปรับ)
+            y1 = 750 + i*220
+            y2 = 900 + i*220
+            x1 = 1750
+            x2 = 2350
+
+            roi = gray[y1:y2, x1:x2]
+
+            # ⭐ แสดงรูป ROI ให้ดูในหน้าเว็บ
+            st.image(roi, caption=f"ROI ข้อ {i}")
+
             pred = trocr_read(roi)
             results[i]=pred
 
-            if pred==ANSWER_KEYS[exam][i]:
+            correct = ANSWER_KEYS[exam][i]
+
+            if pred==correct:
                 st.success(f"ข้อ {i}: {pred} ✓")
                 score+=1
             else:
-                st.error(f"ข้อ {i}: {pred}")
+                st.error(f"ข้อ {i}: {pred} ✗ | ตอบ {correct}")
 
         st.subheader(f"คะแนนรวม {score}/10")
 
