@@ -4,3 +4,4 @@ pillow
 opencv-python-headless
 scikit-image
 pandas
+psycopg2-binary
