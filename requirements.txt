@@ -8,3 +8,5 @@ psycopg2-binary
 torch
 torchvision
 torchaudio
+transformers
+sentencepiece
