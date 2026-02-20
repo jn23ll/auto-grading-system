@@ -7,7 +7,9 @@ from PIL import Image
 import pytesseract
 
 from database import init_db, connect_db
-if os.name != "nt":  # บน linux
+
+# สำหรับ Linux (Streamlit Cloud)
+if os.name != "nt":
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
     
 # ================= INIT DATABASE =================
