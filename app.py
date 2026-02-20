@@ -71,7 +71,8 @@ def read_digit_tesseract(gray):
         config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789.,'
 
         text = pytesseract.image_to_string(clean, config=config)
-        text = "".join([c for c in text if c.isdigit() or c=="."])
+        text = "".join([c for c in text if c.isdigit() or c in [".", ","]])
+        text = text.replace(",", ".")
 
         return text.strip()
 
