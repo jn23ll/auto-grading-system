@@ -5,12 +5,21 @@ import os
 import pandas as pd
 from PIL import Image
 import pytesseract
+import subprocess
 
 from database import init_db, connect_db
 
 # สำหรับ Linux (Streamlit Cloud)
 if os.name != "nt":
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+
+def check_tesseract():
+    try:
+        path = subprocess.getoutput("which tesseract")
+        version = subprocess.getoutput("tesseract --version")
+        return path, version
+    except:
+        return None, None
     
 # ================= INIT DATABASE =================
 init_db()
@@ -35,35 +44,40 @@ ANSWER_KEYS = {
     "Exercise 9": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
     "Exercise 10": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
 }
-
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
 # ================= OCR FUNCTION (DIGIT ONLY) =================
 def read_digit_tesseract(gray):
 
-    # เพิ่ม contrast
-    gray = cv2.equalizeHist(gray)
+    if gray is None or gray.size == 0:
+        return ""
 
-    # OTSU threshold
-    _, thresh = cv2.threshold(
-        gray, 0, 255,
-        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )
+    try:
+        gray = cv2.equalizeHist(gray)
 
-    # ลบ noise
-    kernel = np.ones((2,2), np.uint8)
-    clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        _, thresh = cv2.threshold(
+            gray, 0, 255,
+            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        )
+        
+        # ลบ noise
+        kernel = np.ones((2,2), np.uint8)
+        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-    # ขยายภาพ
-    clean = cv2.resize(clean, None, fx=2.5, fy=2.5,
-                       interpolation=cv2.INTER_CUBIC)
+        # ขยายภาพ
+        clean = cv2.resize(clean, None, fx=2.5, fy=2.5,
+                           interpolation=cv2.INTER_CUBIC)
 
-    config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789.'
+        config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789.,'
 
-    text = pytesseract.image_to_string(clean, config=config)
-    text = "".join([c for c in text if c.isdigit() or c=="."])
+        text = pytesseract.image_to_string(clean, config=config)
+        text = "".join([c for c in text if c.isdigit() or c=="."])
 
-    return text.strip()
+        return text.strip()
+
+    except Exception as e:
+        st.warning(f"OCR error: {e}")
+        return ""
 
 # ================= CROP HANDWRITING =================
 def crop_handwriting_zone(roi):
@@ -173,6 +187,11 @@ def save_results(student_code, exam_name, results):
 def ocr_page():
     st.title("📄 ตรวจข้อสอบ")
 
+    # DEBUG TESSERACT
+    path, version = check_tesseract()
+    st.caption(f"Tesseract Path: {path}")
+    st.caption(f"Version: {version.splitlines()[0] if version else 'Not Found'}")
+
     exam = st.selectbox("เลือกแบบฝึก", EXAM_LIST)
     file = st.file_uploader("Upload กระดาษคำตอบ")
 
@@ -216,6 +235,11 @@ def ocr_page():
                 continue
 
             roi = img[y1:y2, x1:x2]
+
+            if roi.size == 0:
+                st.warning(f"⚠ ROI ข้อ {i} ว่าง")
+                continue
+                
             hand = crop_handwriting_zone(roi)
             gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
 
