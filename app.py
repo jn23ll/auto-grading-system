@@ -1,7 +1,6 @@
 import streamlit as st
 import cv2
 import numpy as np
-import os
 import pandas as pd
 from PIL import Image
 from paddleocr import PaddleOCR
@@ -45,17 +44,29 @@ ANSWER_KEYS = {
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
 # ================= OCR FUNCTION (DIGIT ONLY) =================
-def read_digit_tesseract(gray):
+def read_digit_paddle(gray):
 
     if gray is None or gray.size == 0:
         return ""
 
     try:
+        # เพิ่ม contrast
         gray = cv2.equalizeHist(gray)
-        gray = cv2.resize(gray, None, fx=2.0, fy=2.0,
-                          interpolation=cv2.INTER_CUBIC)
 
-        img_rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+        # ลบ noise
+        blur = cv2.GaussianBlur(gray, (3,3), 0)
+
+        # threshold
+        _, thresh = cv2.threshold(
+            blur, 0, 255,
+            cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        )
+
+        # ขยายภาพ
+        thresh = cv2.resize(thresh, None, fx=2.0, fy=2.0,
+                            interpolation=cv2.INTER_CUBIC)
+
+        img_rgb = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
 
         result = ocr_model.ocr(img_rgb, cls=False)
 
@@ -64,12 +75,15 @@ def read_digit_tesseract(gray):
 
         text = result[0][0][1][0]
 
+        # เก็บเฉพาะตัวเลข . ,
         text = "".join([c for c in text if c.isdigit() or c in [".", ","]])
+
+        # แปลง comma เป็น dot
         text = text.replace(",", ".")
 
         return text.strip()
 
-    except:
+    except Exception as e:
         return ""
 
 # ================= CROP HANDWRITING =================
