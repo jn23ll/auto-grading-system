@@ -4,22 +4,20 @@ import numpy as np
 import os
 import pandas as pd
 from PIL import Image
-import pytesseract
-import subprocess
-
+from paddleocr import PaddleOCR
 from database import init_db, connect_db
 
-# สำหรับ Linux (Streamlit Cloud)
-if os.name != "nt":
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+# ================= LOAD PADDLE OCR =================
+@st.cache_resource
+def load_ocr():
+    return PaddleOCR(
+        use_angle_cls=False,
+        lang='en',
+        use_gpu=False,
+        show_log=False
+    )
 
-def check_tesseract():
-    try:
-        path = subprocess.getoutput("which tesseract")
-        version = subprocess.getoutput("tesseract --version")
-        return path, version
-    except:
-        return None, None
+ocr_model = load_ocr()
     
 # ================= INIT DATABASE =================
 init_db()
@@ -54,30 +52,24 @@ def read_digit_tesseract(gray):
 
     try:
         gray = cv2.equalizeHist(gray)
+        gray = cv2.resize(gray, None, fx=2.0, fy=2.0,
+                          interpolation=cv2.INTER_CUBIC)
 
-        _, thresh = cv2.threshold(
-            gray, 0, 255,
-            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-        )
-        
-        # ลบ noise
-        kernel = np.ones((2,2), np.uint8)
-        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        img_rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        # ขยายภาพ
-        clean = cv2.resize(clean, None, fx=2.5, fy=2.5,
-                           interpolation=cv2.INTER_CUBIC)
+        result = ocr_model.ocr(img_rgb, cls=False)
 
-        config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789.,'
+        if not result or not result[0]:
+            return ""
 
-        text = pytesseract.image_to_string(clean, config=config)
+        text = result[0][0][1][0]
+
         text = "".join([c for c in text if c.isdigit() or c in [".", ","]])
         text = text.replace(",", ".")
 
         return text.strip()
 
-    except Exception as e:
-        st.warning(f"OCR error: {e}")
+    except:
         return ""
 
 # ================= CROP HANDWRITING =================
