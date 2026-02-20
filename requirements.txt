@@ -3,3 +3,4 @@ pytesseract
 opencv-python-headless
 numpy
 Pillow
+psycopg2-binary
