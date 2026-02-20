@@ -176,6 +176,13 @@ def ocr_page():
         image = Image.open(file).convert("RGB")
         img = np.array(image)
 
+        orig_h, orig_w = img.shape[:2]
+
+        # ========= SCALE SYSTEM =========
+        DISPLAY_WIDTH = 900
+        scale = DISPLAY_WIDTH / orig_w
+
+        # ROI พิกัดที่วัดจากภาพกว้าง 900px
         display_boxes = [
             (625,243,788,311),(622,309,785,382),(624,384,784,448),
             (622,454,805,529),(622,533,785,613),(624,619,783,685),
@@ -187,6 +194,22 @@ def ocr_page():
         score = 0
 
         for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
+
+            # ====== แปลงพิกัดกลับสู่ขนาดจริง ======
+            x1 = int(x1 / scale)
+            y1 = int(y1 / scale)
+            x2 = int(x2 / scale)
+            y2 = int(y2 / scale)
+
+            # ====== clamp กันพิกัดหลุดภาพ ======
+            x1 = max(0, min(x1, orig_w-1))
+            x2 = max(0, min(x2, orig_w))
+            y1 = max(0, min(y1, orig_h-1))
+            y2 = max(0, min(y2, orig_h))
+
+            if x2 <= x1 or y2 <= y1:
+                st.error(f"❌ ROI ข้อ {i} ผิดพิกัด")
+                continue
 
             roi = img[y1:y2, x1:x2]
             hand = crop_handwriting_zone(roi)
@@ -210,7 +233,7 @@ def ocr_page():
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกแล้ว")
-
+            
 # ================= DASHBOARD STUDENT =================
 def dashboard():
     st.title("📊 Dashboard นักศึกษา")
