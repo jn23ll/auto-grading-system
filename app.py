@@ -3,8 +3,14 @@ import cv2
 import numpy as np
 import pandas as pd
 import easyocr
+import re
 from PIL import Image
 from database import init_db, connect_db
+
+match = re.search(r"\d+\.?\d*", text)
+if match:
+    return match.group()
+return ""
 
 # ================= LOAD EASY OCR =================
 @st.cache_resource
@@ -55,13 +61,9 @@ def read_digit_easyocr(gray):
         return ""
 
     try:
-        # เพิ่ม contrast
         gray = cv2.equalizeHist(gray)
-
-        # blur เล็กน้อย
         blur = cv2.GaussianBlur(gray, (3,3), 0)
 
-        # adaptive threshold (แม่นกว่ากับลายมือ)
         thresh = cv2.adaptiveThreshold(
             blur, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -69,32 +71,35 @@ def read_digit_easyocr(gray):
             11, 2
         )
 
-        # ขยายภาพ
         thresh = cv2.resize(
-            thresh, None,
-            fx=2.0, fy=2.0,
+            thresh, None, fx=2.0, fy=2.0,
             interpolation=cv2.INTER_CUBIC
         )
 
-        # OCR
         result = reader.readtext(
             thresh,
-            allowlist='0123456789',
-            detail=0,
+            allowlist='0123456789.',
+            detail=1,
             paragraph=False
         )
 
         if not result:
             return ""
 
-        text = "".join(result)
+        # เลือกข้อความที่ confidence สูงสุด
+        best = max(result, key=lambda x: x[2])
+        text = best[1]
 
-        # กรองเอาเฉพาะตัวเลข
-        text = "".join([c for c in text if c.isdigit()])
+        # regex ดึงตัวเลข
+        import re
+        match = re.search(r"\d+\.?\d*", text)
 
-        return text
+        if match:
+            return match.group()
 
-    except Exception as e:
+        return ""
+
+    except Exception:
         return ""
         
 # ================= CROP HANDWRITING =================
