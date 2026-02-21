@@ -1,6 +1,8 @@
-streamlit==1.32.0
-paddlepaddle==2.6.1
+streamlit
 paddleocr==2.7.0.3
-opencv-python-headless==4.9.0.80
-Pillow
+paddlepaddle==2.5.2
+opencv-python-headless
 numpy
+pandas
+Pillow
+psycopg2-binary
