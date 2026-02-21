@@ -1,7 +1,8 @@
 streamlit==1.32.2
-paddleocr==2.7.3
-paddlepaddle==3.3.0
+easyocr
 opencv-python-headless
 numpy
-pillow
+Pillow
 pandas
+torch
+torchvision
