@@ -2,21 +2,16 @@ import streamlit as st
 import cv2
 import numpy as np
 import pandas as pd
+import easyocr
 from PIL import Image
-from paddleocr import PaddleOCR
 from database import init_db, connect_db
 
-# ================= LOAD PADDLE OCR =================
+# ================= LOAD EASY OCR =================
 @st.cache_resource
 def load_ocr():
-    return PaddleOCR(
-        use_angle_cls=True,
-        lang='en',
-        use_gpu=False,
-        show_log=False
-    )
+    return easyocr.Reader(['en'], gpu=False)
 
-ocr_model = load_ocr()
+reader = load_ocr()
     
 # ================= INIT DATABASE =================
 init_db()
@@ -53,40 +48,35 @@ def clean_text(text):
     text = text.replace(",", ".")
     return text
 
-# ================= OCR FUNCTION =================
-def read_digit_paddle(gray):
+# ================= EASY OCR FUNCTION =================
+def read_digit_easyocr(gray):
 
     if gray is None or gray.size == 0:
         return ""
 
     try:
-        # เพิ่ม contrast
         gray = cv2.equalizeHist(gray)
-
-        # ลบ noise
         blur = cv2.GaussianBlur(gray, (3,3), 0)
-
-        # threshold
         _, thresh = cv2.threshold(
             blur, 0, 255,
             cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
 
-        # ขยายภาพ
-        thresh = cv2.resize(thresh, None, fx=2.0, fy=2.0,
-                            interpolation=cv2.INTER_CUBIC)
+        thresh = cv2.resize(
+            thresh, None, fx=2.0, fy=2.0,
+            interpolation=cv2.INTER_CUBIC
+        )
 
-        img_rgb = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
+        result = reader.readtext(
+            thresh,
+            allowlist='0123456789.,',
+            detail=0
+        )
 
-        result = ocr_model.ocr(img_rgb, cls=False)
-
-        if not result or not result[0]:
+        if not result:
             return ""
 
-        text = ""
-        for line in result[0]:
-            text += line[1][0]
-
+        text = "".join(result)
         return clean_text(text)
 
     except Exception:
