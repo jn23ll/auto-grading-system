@@ -11,7 +11,7 @@ from database import init_db, connect_db
 def load_ocr():
     return easyocr.Reader(['en'], gpu=False)
 
-reader = load_ocr()
+reader = load_reader()
     
 # ================= INIT DATABASE =================
 init_db()
@@ -190,11 +190,6 @@ def save_results(student_code, exam_name, results):
 def ocr_page():
     st.title("📄 ตรวจข้อสอบ")
 
-    # DEBUG TESSERACT
-    path, version = check_tesseract()
-    st.caption(f"Tesseract Path: {path}")
-    st.caption(f"Version: {version.splitlines()[0] if version else 'Not Found'}")
-
     exam = st.selectbox("เลือกแบบฝึก", EXAM_LIST)
     file = st.file_uploader("Upload กระดาษคำตอบ")
 
@@ -248,7 +243,7 @@ def ocr_page():
 
             st.image(gray, caption=f"ROI ข้อ {i}", width=200)
 
-            pred = read_digit_tesseract(gray)
+            pred = read_digit_easyocr(gray)
             results[i] = pred
 
             correct = ANSWER_KEYS[exam][i]
