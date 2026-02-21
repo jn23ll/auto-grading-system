@@ -8,7 +8,7 @@ from database import init_db, connect_db
 
 # ================= LOAD EASY OCR =================
 @st.cache_resource
-def load_ocr():
+def load_reader():
     return easyocr.Reader(['en'], gpu=False)
 
 reader = load_reader()
@@ -55,33 +55,48 @@ def read_digit_easyocr(gray):
         return ""
 
     try:
+        # เพิ่ม contrast
         gray = cv2.equalizeHist(gray)
+
+        # blur เล็กน้อย
         blur = cv2.GaussianBlur(gray, (3,3), 0)
-        _, thresh = cv2.threshold(
-            blur, 0, 255,
-            cv2.THRESH_BINARY + cv2.THRESH_OTSU
+
+        # adaptive threshold (แม่นกว่ากับลายมือ)
+        thresh = cv2.adaptiveThreshold(
+            blur, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            11, 2
         )
 
+        # ขยายภาพ
         thresh = cv2.resize(
-            thresh, None, fx=2.0, fy=2.0,
+            thresh, None,
+            fx=2.0, fy=2.0,
             interpolation=cv2.INTER_CUBIC
         )
 
+        # OCR
         result = reader.readtext(
             thresh,
-            allowlist='0123456789.,',
-            detail=0
+            allowlist='0123456789',
+            detail=0,
+            paragraph=False
         )
 
         if not result:
             return ""
 
         text = "".join(result)
-        return clean_text(text)
 
-    except Exception:
+        # กรองเอาเฉพาะตัวเลข
+        text = "".join([c for c in text if c.isdigit()])
+
+        return text
+
+    except Exception as e:
         return ""
-
+        
 # ================= CROP HANDWRITING =================
 def crop_handwriting_zone(roi):
     h, w = roi.shape[:2]
