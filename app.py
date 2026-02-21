@@ -10,7 +10,7 @@ from database import init_db, connect_db
 @st.cache_resource
 def load_ocr():
     return PaddleOCR(
-        use_angle_cls=False,
+        use_angle_cls=True,
         lang='en',
         use_gpu=False,
         show_log=False
@@ -43,7 +43,17 @@ ANSWER_KEYS = {
 }
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
-# ================= OCR FUNCTION (DIGIT ONLY) =================
+# ================= CLEAN TEXT =================
+def clean_text(text):
+    if not text:
+        return ""
+    text = text.strip()
+    text = text.replace("O","0").replace("o","0")
+    text = re.sub(r"[^0-9.,-]", "", text)
+    text = text.replace(",", ".")
+    return text
+
+# ================= OCR FUNCTION =================
 def read_digit_paddle(gray):
 
     if gray is None or gray.size == 0:
@@ -73,17 +83,13 @@ def read_digit_paddle(gray):
         if not result or not result[0]:
             return ""
 
-        text = result[0][0][1][0]
+        text = ""
+        for line in result[0]:
+            text += line[1][0]
 
-        # เก็บเฉพาะตัวเลข . ,
-        text = "".join([c for c in text if c.isdigit() or c in [".", ","]])
+        return clean_text(text)
 
-        # แปลง comma เป็น dot
-        text = text.replace(",", ".")
-
-        return text.strip()
-
-    except Exception as e:
+    except Exception:
         return ""
 
 # ================= CROP HANDWRITING =================
