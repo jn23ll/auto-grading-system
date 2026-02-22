@@ -157,6 +157,7 @@ def register_page():
 
     cur.close()
     conn.close()
+    
 # ================= LOGIN =================
 def login_page():
     st.title("🔐 Login")
