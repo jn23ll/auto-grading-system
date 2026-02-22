@@ -23,27 +23,6 @@ if "logged_in" not in st.session_state:
     st.session_state.role = ""
     st.session_state.user = ""
     st.session_state.student_name = ""
-
-def init_db():
-    conn = connect_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS students(
-        student_code VARCHAR(50) PRIMARY KEY,
-        password VARCHAR(100),
-        full_name VARCHAR(200),
-        role VARCHAR(20),
-        faculty VARCHAR(200),
-        major VARCHAR(200),
-        class_group VARCHAR(50),
-        year_level VARCHAR(20)
-    )
-    """)
-
-    conn.commit()
-    cur.close()
-    conn.close()
     
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
