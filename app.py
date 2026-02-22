@@ -249,6 +249,7 @@ def ocr_page():
                 continue
 
             hand = crop_handwriting_zone(roi)
+            st.image(hand, caption=f"Crop ข้อ {i}")
 
             if hand.size == 0:
                 st.error(f"ข้อ {i}: handwriting zone ว่าง")
@@ -256,19 +257,21 @@ def ocr_page():
                 continue
 
             gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray,(5,5),0)
+            _, gray = cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
             pred = read_digit_easyocr(gray)
             results[i] = pred
 
             correct = ANSWER_KEYS[exam][i]
 
-            if is_equal(pred, correct):
-                st.success(f"ข้อ {i}: {pred} ✓")
-                score += 1
+             if is_equal(pred, correct):
+                 st.success(f"ข้อ {i}: {pred} ✓")
+                 score += 1
             else:
                 st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
-                st.subheader(f"🎯 คะแนนรวม {score}/10")
 
+                st.subheader(f"🎯 คะแนนรวม {score}/10")
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกคะแนนเรียบร้อยแล้ว")
