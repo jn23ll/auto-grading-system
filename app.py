@@ -229,27 +229,24 @@ def ocr_page():
 
         for i, (x1, y1, x2, y2) in enumerate(display_boxes, 1):
 
-            # 🔹 clamp กันพิกัดหลุดภาพ
             x1 = max(0, min(x1, orig_w-1))
             x2 = max(0, min(x2, orig_w))
             y1 = max(0, min(y1, orig_h-1))
             y2 = max(0, min(y2, orig_h))
 
-            # 🔹 เช็คว่าพิกัดถูกต้อง
             if x2 <= x1 or y2 <= y1:
                 st.error(f"ข้อ {i}: พิกัดผิด")
                 results[i] = ""
                 continue
 
             roi = img[y1:y2, x1:x2]
-
             if roi.size == 0:
                 st.error(f"ข้อ {i}: crop ไม่สำเร็จ")
                 results[i] = ""
                 continue
 
             hand = crop_handwriting_zone(roi)
-            st.image(hand, caption=f"Crop ข้อ {i}")
+            st.image(hand, caption=f"Crop ข้อ {i}")  # 🔍 debug
 
             if hand.size == 0:
                 st.error(f"ข้อ {i}: handwriting zone ว่าง")
@@ -265,13 +262,13 @@ def ocr_page():
 
             correct = ANSWER_KEYS[exam][i]
 
-             if is_equal(pred, correct):
-                 st.success(f"ข้อ {i}: {pred} ✓")
-                 score += 1
+            if is_equal(pred, correct):
+                st.success(f"ข้อ {i}: {pred} ✓")
+                score += 1
             else:
                 st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
 
-                st.subheader(f"🎯 คะแนนรวม {score}/10")
+        st.subheader(f"🎯 คะแนนรวม {score}/10")
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกคะแนนเรียบร้อยแล้ว")
