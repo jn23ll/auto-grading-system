@@ -26,8 +26,16 @@ if "logged_in" not in st.session_state:
     
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
-    f"Exercise {i}": {j: str(j*j) for j in range(1,11)}
-    for i in range(1,11)
+"Exercise 1": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+"Exercise 2": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
+"Exercise 3": {1:"5",2:"10",3:"15",4:"20",5:"25",6:"30",7:"35",8:"40",9:"45",10:"50"}, 
+"Exercise 4": {1:"3",2:"6",3:"9",4:"12",5:"15",6:"18",7:"21",8:"24",9:"27",10:"30"}, 
+"Exercise 5": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"}, 
+"Exercise 6": {1:"11",2:"22",3:"33",4:"44",5:"55",6:"66",7:"77",8:"88",9:"99",10:"111"}, 
+"Exercise 7": {1:"7",2:"14",3:"21",4:"28",5:"35",6:"42",7:"49",8:"56",9:"63",10:"70"}, 
+"Exercise 8": {1:"8",2:"16",3:"24",4:"32",5:"40",6:"48",7:"56",8:"64",9:"72",10:"80"}, 
+"Exercise 9": {1:"9",2:"18",3:"27",4:"36",5:"45",6:"54",7:"63",8:"72",9:"81",10:"90"}, 
+"Exercise 10": {1:"1",2:"2",3:"3",4:"4",5:"5",6:"6",7:"7",8:"8",9:"9",10:"10"}
 }
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
@@ -159,15 +167,23 @@ def save_results(student_code, exam_name, results):
     conn = connect_db()
     cur = conn.cursor()
 
-    for q,pred in results.items():
+    # 🔹 ลบข้อมูลเดิมก่อน (กันบันทึกซ้ำ)
+    cur.execute("""
+        DELETE FROM exam_results
+        WHERE student_code=%s AND exam_name=%s
+    """, (student_code, exam_name))
+
+    for q, pred in results.items():
         correct = ANSWER_KEYS[exam_name][q]
+
         cur.execute("""
         INSERT INTO exam_results
-        (student_code,exam_name,question_no,
-        predicted_answer,correct_answer,is_correct)
+        (student_code, exam_name, question_no,
+        predicted_answer, correct_answer, is_correct)
         VALUES(%s,%s,%s,%s,%s,%s)
-        """,(student_code,exam_name,q,
-             pred,correct,pred==correct))
+        """,
+        (student_code, exam_name, q,
+         pred, correct, pred == correct))
 
     conn.commit()
     cur.close()
@@ -184,14 +200,55 @@ def ocr_page():
         image = Image.open(file).convert("RGB")
         img = np.array(image)
 
-        display_boxes = [(625,243,788,311)]*10
+        orig_h, orig_w = img.shape[:2]
+
+        # -------------------------------
+        # กำหนดตำแหน่งกรอบ (ไม่ซ้ำกัน)
+        # -------------------------------
+        display_boxes = [
+            (625,243,788,311),
+            (622,309,785,382),
+            (624,384,784,448),
+            (622,454,805,529),
+            (622,533,785,613),
+            (624,619,783,685),
+            (622,689,785,754),
+            (622,762,783,823),
+            (622,830,783,895),
+            (621,899,783,965),
+        ]
 
         results = {}
         score = 0
 
-        for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
+        for i, (x1, y1, x2, y2) in enumerate(display_boxes, 1):
+
+            # 🔹 clamp กันพิกัดหลุดภาพ
+            x1 = max(0, min(x1, orig_w-1))
+            x2 = max(0, min(x2, orig_w))
+            y1 = max(0, min(y1, orig_h-1))
+            y2 = max(0, min(y2, orig_h))
+
+            # 🔹 เช็คว่าพิกัดถูกต้อง
+            if x2 <= x1 or y2 <= y1:
+                st.error(f"ข้อ {i}: พิกัดผิด")
+                results[i] = ""
+                continue
+
             roi = img[y1:y2, x1:x2]
+
+            if roi.size == 0:
+                st.error(f"ข้อ {i}: crop ไม่สำเร็จ")
+                results[i] = ""
+                continue
+
             hand = crop_handwriting_zone(roi)
+
+            if hand.size == 0:
+                st.error(f"ข้อ {i}: handwriting zone ว่าง")
+                results[i] = ""
+                continue
+
             gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
 
             pred = read_digit_easyocr(gray)
@@ -203,14 +260,14 @@ def ocr_page():
                 st.success(f"ข้อ {i}: {pred} ✓")
                 score += 1
             else:
-                st.error(f"ข้อ {i}: {pred} ✗ | ตอบ {correct}")
+                st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
 
         st.subheader(f"🎯 คะแนนรวม {score}/10")
 
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
-            st.success("บันทึกแล้ว")
-
+            st.success("บันทึกคะแนนเรียบร้อยแล้ว")
+            
 # ================= DASHBOARD STUDENT =================
 def dashboard():
     st.title("📊 Dashboard นักศึกษา")
