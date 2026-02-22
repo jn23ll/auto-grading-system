@@ -49,6 +49,12 @@ def clean_text(text):
     text = text.replace(",", ".")
     return text
 
+def is_equal(a, b):
+    try:
+        return float(a) == float(b)
+    except:
+        return False
+        
 # ================= EASY OCR FUNCTION =================
 def read_digit_easyocr(gray):
     if gray is None or gray.size == 0:
@@ -80,7 +86,7 @@ def read_digit_easyocr(gray):
         best = max(result,key=lambda x:x[2])
         match = re.search(r"\d+\.?\d*", best[1])
         if match:
-            return match.group()
+            return clean_text(match.group())
 
         return ""
 
@@ -183,7 +189,7 @@ def save_results(student_code, exam_name, results):
         VALUES(%s,%s,%s,%s,%s,%s)
         """,
         (student_code, exam_name, q,
-         pred, correct, pred == correct))
+         pred, correct, is_equal(pred, correct)))
 
     conn.commit()
     cur.close()
@@ -256,13 +262,12 @@ def ocr_page():
 
             correct = ANSWER_KEYS[exam][i]
 
-            if pred == correct:
+            if is_equal(pred, correct):
                 st.success(f"ข้อ {i}: {pred} ✓")
                 score += 1
             else:
                 st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
-
-        st.subheader(f"🎯 คะแนนรวม {score}/10")
+                st.subheader(f"🎯 คะแนนรวม {score}/10")
 
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
