@@ -247,29 +247,52 @@ def dashboard():
     st.title("📊 Dashboard นักศึกษา")
 
     conn = connect_db()
+    cur = conn.cursor()
 
-    # ================= โหลดข้อมูลนักเรียน =================
-    student_info = pd.read_sql("""
-        SELECT full_name, faculty, major,
-               class_group, year_level
+    # -------------------------------
+    # ตรวจสอบว่า column ไหนมีอยู่จริง
+    # -------------------------------
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+    """)
+    existing_columns = [row[0] for row in cur.fetchall()]
+
+    fields = ["full_name"]
+    optional_fields = ["faculty","major","class_group","year_level"]
+
+    for col in optional_fields:
+        if col in existing_columns:
+            fields.append(col)
+
+    query = f"""
+        SELECT {', '.join(fields)}
         FROM students
         WHERE student_code=%s
-    """, conn, params=(st.session_state.user,))
+    """
 
-    # ================= โหลดคะแนน =================
+    student_info = pd.read_sql(query, conn,
+                               params=(st.session_state.user,))
+
+    # -------------------------------
+    # โหลดคะแนน
+    # -------------------------------
     df = pd.read_sql("""
-    SELECT exam_name,
-    SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
-    COUNT(question_no) as total_questions
-    FROM exam_results
-    WHERE student_code=%s
-    GROUP BY exam_name
-    ORDER BY exam_name
+        SELECT exam_name,
+        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
+        COUNT(question_no) as total_questions
+        FROM exam_results
+        WHERE student_code=%s
+        GROUP BY exam_name
+        ORDER BY exam_name
     """, conn, params=(st.session_state.user,))
 
     conn.close()
 
-    # ================= แสดงข้อมูลนักเรียน =================
+    # -------------------------------
+    # แสดงข้อมูลนักศึกษา
+    # -------------------------------
     st.subheader("👤 ข้อมูลนักศึกษา")
 
     if not student_info.empty:
@@ -277,39 +300,38 @@ def dashboard():
 
         col1, col2 = st.columns(2)
         col1.metric("รหัสนักศึกษา", st.session_state.user)
-        col2.metric("ชื่อ-สกุล", info["full_name"])
+        col2.metric("ชื่อ-สกุล", info.get("full_name","-"))
 
-        col3, col4 = st.columns(2)
-        col3.metric("คณะ", info["faculty"] or "-")
-        col4.metric("สาขา", info["major"] or "-")
+        if "faculty" in info:
+            col3, col4 = st.columns(2)
+            col3.metric("คณะ", info.get("faculty","-"))
+            col4.metric("สาขา", info.get("major","-"))
 
-        col5, col6 = st.columns(2)
-        col5.metric("กลุ่มเรียน", info["class_group"] or "-")
-        col6.metric("ชั้นปี", info["year_level"] or "-")
+        if "class_group" in info:
+            col5, col6 = st.columns(2)
+            col5.metric("กลุ่มเรียน", info.get("class_group","-"))
+            col6.metric("ชั้นปี", info.get("year_level","-"))
 
     st.divider()
 
-    # ================= สรุปคะแนน =================
+    # -------------------------------
+    # แสดงคะแนน
+    # -------------------------------
     if not df.empty:
         df["เปอร์เซ็นต์"] = (df["score"]/df["total_questions"])*100
 
-        st.subheader("📈 สรุปผลรวม")
         c1,c2,c3 = st.columns(3)
         c1.metric("จำนวนแบบฝึก", len(df))
         c2.metric("คะแนนเฉลี่ย", f"{df['เปอร์เซ็นต์'].mean():.2f}%")
         c3.metric("คะแนนสูงสุด", f"{df['เปอร์เซ็นต์'].max():.2f}%")
 
         st.divider()
-
-        st.subheader("📄 ประวัติการสอบ")
         st.dataframe(df,use_container_width=True)
-
-        st.subheader("📊 กราฟคะแนนย้อนหลัง")
         st.line_chart(df.set_index("exam_name")["เปอร์เซ็นต์"])
 
     else:
         st.info("ยังไม่มีประวัติการสอบ")
-
+        
 # ================= DASHBOARD TEACHER =================
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
