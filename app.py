@@ -41,22 +41,10 @@ def init_db():
     )
     """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS exam_results(
-        id SERIAL PRIMARY KEY,
-        student_code VARCHAR(50),
-        exam_name VARCHAR(100),
-        question_no INT,
-        predicted_answer VARCHAR(50),
-        correct_answer VARCHAR(50),
-        is_correct BOOLEAN
-    )
-    """)
-
     conn.commit()
     cur.close()
     conn.close()
-
+    
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
     f"Exercise {i}": {j: str(j*j) for j in range(1,11)}
