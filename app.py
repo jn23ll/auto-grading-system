@@ -145,12 +145,13 @@ def register_page():
             else:
                 cur.execute("""
                 INSERT INTO students
-                (student_code,password,full_name,role,
-                 faculty,major,class_group,year_level)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+                (student_code, password, full_name, role,
+                 faculty, major, class_group, year_level)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
-                (code,pw,name,role,
-                 faculty,major,class_group,year_level))
+                (code, pw, name, role,
+                 faculty, major, class_group, year_level)
+                )
 
                 conn.commit()
                 st.success("สมัครสำเร็จ 🎉")
