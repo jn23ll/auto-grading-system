@@ -7,18 +7,13 @@ import re
 from PIL import Image
 from database import init_db, connect_db
 
-match = re.search(r"\d+\.?\d*", text)
-if match:
-    return match.group()
-return ""
-
 # ================= LOAD EASY OCR =================
 @st.cache_resource
 def load_reader():
     return easyocr.Reader(['en'], gpu=False)
 
 reader = load_reader()
-    
+
 # ================= INIT DATABASE =================
 init_db()
 
@@ -33,14 +28,14 @@ if "logged_in" not in st.session_state:
 ANSWER_KEYS = {
     "Exercise 1": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
     "Exercise 2": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
-    "Exercise 3": {1:"5",2:"10",3:"15",4:"20",5:"25",6:"30",7:"35",8:"40",9:"45",10:"50"},
-    "Exercise 4": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+    "Exercise 3": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+    "Exercise 4": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
     "Exercise 5": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 6": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+    "Exercise 6": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
     "Exercise 7": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 8": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+    "Exercise 8": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
     "Exercise 9": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 10": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
+    "Exercise 10": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
 }
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
@@ -86,14 +81,10 @@ def read_digit_easyocr(gray):
         if not result:
             return ""
 
-        # เลือกข้อความที่ confidence สูงสุด
         best = max(result, key=lambda x: x[2])
         text = best[1]
 
-        # regex ดึงตัวเลข
-        import re
         match = re.search(r"\d+\.?\d*", text)
-
         if match:
             return match.group()
 
@@ -101,7 +92,7 @@ def read_digit_easyocr(gray):
 
     except Exception:
         return ""
-        
+
 # ================= CROP HANDWRITING =================
 def crop_handwriting_zone(roi):
     h, w = roi.shape[:2]
@@ -123,9 +114,6 @@ def register_page():
             code = st.text_input("รหัสนักศึกษา")
             pw = st.text_input("Password", type="password")
             name = st.text_input("ชื่อ-สกุล")
-            faculty = st.text_input("คณะ")
-            major = st.text_input("สาขา")
-            group = st.text_input("กลุ่มเรียน")
 
             if st.form_submit_button("สมัคร"):
                 cur.execute("SELECT * FROM students WHERE student_code=%s",(code,))
@@ -134,9 +122,9 @@ def register_page():
                 else:
                     cur.execute("""
                     INSERT INTO students
-                    (student_code,password,full_name,faculty,major,class_group,role)
-                    VALUES(%s,%s,%s,%s,%s,%s,'student')
-                    """,(code,pw,name,faculty,major,group))
+                    (student_code,password,full_name,role)
+                    VALUES(%s,%s,%s,'student')
+                    """,(code,pw,name))
                     conn.commit()
                     st.success("สมัครสำเร็จ 🎉")
 
@@ -158,6 +146,7 @@ def register_page():
                     conn.commit()
                     st.success("สมัครอาจารย์สำเร็จ 🎉")
 
+    cur.close()
     conn.close()
 
 # ================= LOGIN =================
@@ -176,6 +165,7 @@ def login_page():
         WHERE student_code=%s AND password=%s
         """,(code,pw))
         user = cur.fetchone()
+        cur.close()
         conn.close()
 
         if user:
@@ -193,6 +183,7 @@ def save_results(student_code, exam_name, results):
     cur = conn.cursor()
 
     for q,pred in results.items():
+        correct = ANSWER_KEYS[exam_name][q]
         cur.execute("""
         INSERT INTO exam_results
         (student_code,exam_name,question_no,
@@ -200,10 +191,11 @@ def save_results(student_code, exam_name, results):
         VALUES(%s,%s,%s,%s,%s,%s)
         """,(student_code,exam_name,q,
              pred,
-             ANSWER_KEYS[exam_name][q],
-             pred==ANSWER_KEYS[exam_name][q]))
+             correct,
+             pred==correct))
 
     conn.commit()
+    cur.close()
     conn.close()
 
 # ================= OCR PAGE =================
@@ -217,13 +209,6 @@ def ocr_page():
         image = Image.open(file).convert("RGB")
         img = np.array(image)
 
-        orig_h, orig_w = img.shape[:2]
-
-        # ========= SCALE SYSTEM =========
-        DISPLAY_WIDTH = 900
-        scale = DISPLAY_WIDTH / orig_w
-
-        # ROI พิกัดที่วัดจากภาพกว้าง 900px
         display_boxes = [
             (625,243,788,311),(622,309,785,382),(624,384,784,448),
             (622,454,805,529),(622,533,785,613),(624,619,783,685),
@@ -235,29 +220,7 @@ def ocr_page():
         score = 0
 
         for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
-
-            # ====== แปลงพิกัดกลับสู่ขนาดจริง ======
-            x1 = int(x1 / scale)
-            y1 = int(y1 / scale)
-            x2 = int(x2 / scale)
-            y2 = int(y2 / scale)
-
-            # ====== clamp กันพิกัดหลุดภาพ ======
-            x1 = max(0, min(x1, orig_w-1))
-            x2 = max(0, min(x2, orig_w))
-            y1 = max(0, min(y1, orig_h-1))
-            y2 = max(0, min(y2, orig_h))
-
-            if x2 <= x1 or y2 <= y1:
-                st.error(f"❌ ROI ข้อ {i} ผิดพิกัด")
-                continue
-
             roi = img[y1:y2, x1:x2]
-
-            if roi.size == 0:
-                st.warning(f"⚠ ROI ข้อ {i} ว่าง")
-                continue
-                
             hand = crop_handwriting_zone(roi)
             gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
 
@@ -279,17 +242,11 @@ def ocr_page():
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกแล้ว")
-            
+
 # ================= DASHBOARD STUDENT =================
 def dashboard():
     st.title("📊 Dashboard นักศึกษา")
     conn = connect_db()
-
-    profile = pd.read_sql("""
-    SELECT student_code,full_name,faculty,major,class_group
-    FROM students WHERE student_code=%s
-    """, conn, params=(st.session_state.user,))
-    st.dataframe(profile)
 
     scores = pd.read_sql("""
     SELECT exam_name,
@@ -305,20 +262,8 @@ def dashboard():
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
     conn = connect_db()
-
     df = pd.read_sql("SELECT * FROM exam_results", conn)
     st.dataframe(df)
-
-    summary = pd.read_sql("""
-    SELECT student_code,exam_name,
-    SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score
-    FROM exam_results
-    GROUP BY student_code,exam_name
-    """, conn)
-
-    st.subheader("คะแนนรวม")
-    st.dataframe(summary)
-
     conn.close()
 
 # ================= MAIN =================
