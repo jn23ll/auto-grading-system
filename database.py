@@ -13,19 +13,26 @@ def init_db():
     conn = connect_db()
     cur = conn.cursor()
 
+    # 1️⃣ สร้างตาราง students ก่อน (ถ้ายังไม่มี)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS students(
         student_code VARCHAR(50) PRIMARY KEY,
         password VARCHAR(100),
         full_name VARCHAR(200),
-        role VARCHAR(20),
-        faculty VARCHAR(200),
-        major VARCHAR(200),
-        class_group VARCHAR(50),
-        year_level VARCHAR(20)
-    )
+        role VARCHAR(20)
+    );
     """)
 
+    # 2️⃣ เพิ่ม column ถ้ายังไม่มี (migration)
+    cur.execute("""
+    ALTER TABLE students
+    ADD COLUMN IF NOT EXISTS faculty VARCHAR(200),
+    ADD COLUMN IF NOT EXISTS major VARCHAR(200),
+    ADD COLUMN IF NOT EXISTS class_group VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS year_level VARCHAR(20);
+    """)
+
+    # 3️⃣ สร้างตารางผลสอบ
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exam_results(
         id SERIAL PRIMARY KEY,
@@ -35,7 +42,7 @@ def init_db():
         predicted_answer VARCHAR(50),
         correct_answer VARCHAR(50),
         is_correct BOOLEAN
-    )
+    );
     """)
 
     conn.commit()
