@@ -26,16 +26,8 @@ if "logged_in" not in st.session_state:
 
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
-    "Exercise 1": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 2": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
-    "Exercise 3": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 4": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
-    "Exercise 5": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 6": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
-    "Exercise 7": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 8": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
-    "Exercise 9": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
-    "Exercise 10": {1:"12",2:"44",3:"81",4:"9",5:"16",6:"25",7:"36",8:"49",9:"64",10:"100"},
+    f"Exercise {i}": {j: str(j*j) for j in range(1,11)}
+    for i in range(1,11)
 }
 EXAM_LIST = list(ANSWER_KEYS.keys())
 
@@ -51,7 +43,6 @@ def clean_text(text):
 
 # ================= EASY OCR FUNCTION =================
 def read_digit_easyocr(gray):
-
     if gray is None or gray.size == 0:
         return ""
 
@@ -60,16 +51,13 @@ def read_digit_easyocr(gray):
         blur = cv2.GaussianBlur(gray, (3,3), 0)
 
         thresh = cv2.adaptiveThreshold(
-            blur, 255,
+            blur,255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV,
-            11, 2
+            11,2
         )
 
-        thresh = cv2.resize(
-            thresh, None, fx=2.0, fy=2.0,
-            interpolation=cv2.INTER_CUBIC
-        )
+        thresh = cv2.resize(thresh,None,fx=2.0,fy=2.0)
 
         result = reader.readtext(
             thresh,
@@ -81,16 +69,14 @@ def read_digit_easyocr(gray):
         if not result:
             return ""
 
-        best = max(result, key=lambda x: x[2])
-        text = best[1]
-
-        match = re.search(r"\d+\.?\d*", text)
+        best = max(result,key=lambda x:x[2])
+        match = re.search(r"\d+\.?\d*", best[1])
         if match:
             return match.group()
 
         return ""
 
-    except Exception:
+    except:
         return ""
 
 # ================= CROP HANDWRITING =================
@@ -109,42 +95,22 @@ def register_page():
     conn = connect_db()
     cur = conn.cursor()
 
-    if role == "student":
-        with st.form("student_reg"):
-            code = st.text_input("รหัสนักศึกษา")
-            pw = st.text_input("Password", type="password")
-            name = st.text_input("ชื่อ-สกุล")
+    with st.form("register"):
+        code = st.text_input("Username / รหัส")
+        pw = st.text_input("Password", type="password")
+        name = st.text_input("ชื่อ-สกุล")
 
-            if st.form_submit_button("สมัคร"):
-                cur.execute("SELECT * FROM students WHERE student_code=%s",(code,))
-                if cur.fetchone():
-                    st.error("มีรหัสนี้แล้ว")
-                else:
-                    cur.execute("""
-                    INSERT INTO students
-                    (student_code,password,full_name,role)
-                    VALUES(%s,%s,%s,'student')
-                    """,(code,pw,name))
-                    conn.commit()
-                    st.success("สมัครสำเร็จ 🎉")
-
-    if role == "teacher":
-        with st.form("teacher_reg"):
-            code = st.text_input("Username")
-            pw = st.text_input("Password", type="password")
-            name = st.text_input("ชื่ออาจารย์")
-
-            if st.form_submit_button("สมัคร"):
-                cur.execute("SELECT * FROM students WHERE student_code=%s",(code,))
-                if cur.fetchone():
-                    st.error("Username ซ้ำ")
-                else:
-                    cur.execute("""
-                    INSERT INTO students(student_code,password,full_name,role)
-                    VALUES(%s,%s,%s,'teacher')
-                    """,(code,pw,name))
-                    conn.commit()
-                    st.success("สมัครอาจารย์สำเร็จ 🎉")
+        if st.form_submit_button("สมัคร"):
+            cur.execute("SELECT * FROM students WHERE student_code=%s",(code,))
+            if cur.fetchone():
+                st.error("Username ซ้ำ")
+            else:
+                cur.execute("""
+                INSERT INTO students(student_code,password,full_name,role)
+                VALUES(%s,%s,%s,%s)
+                """,(code,pw,name,role))
+                conn.commit()
+                st.success("สมัครสำเร็จ 🎉")
 
     cur.close()
     conn.close()
@@ -190,9 +156,7 @@ def save_results(student_code, exam_name, results):
         predicted_answer,correct_answer,is_correct)
         VALUES(%s,%s,%s,%s,%s,%s)
         """,(student_code,exam_name,q,
-             pred,
-             correct,
-             pred==correct))
+             pred,correct,pred==correct))
 
     conn.commit()
     cur.close()
@@ -209,12 +173,7 @@ def ocr_page():
         image = Image.open(file).convert("RGB")
         img = np.array(image)
 
-        display_boxes = [
-            (625,243,788,311),(622,309,785,382),(624,384,784,448),
-            (622,454,805,529),(622,533,785,613),(624,619,783,685),
-            (622,689,785,754),(622,762,783,823),(622,830,783,895),
-            (621,899,783,965),
-        ]
+        display_boxes = [(625,243,788,311)]*10
 
         results = {}
         score = 0
@@ -223,8 +182,6 @@ def ocr_page():
             roi = img[y1:y2, x1:x2]
             hand = crop_handwriting_zone(roi)
             gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
-
-            st.image(gray, caption=f"ROI ข้อ {i}", width=200)
 
             pred = read_digit_easyocr(gray)
             results[i] = pred
@@ -246,17 +203,58 @@ def ocr_page():
 # ================= DASHBOARD STUDENT =================
 def dashboard():
     st.title("📊 Dashboard นักศึกษา")
+
     conn = connect_db()
 
-    scores = pd.read_sql("""
+    df = pd.read_sql("""
     SELECT exam_name,
-    SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score
+    SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
+    COUNT(question_no) as total_questions
     FROM exam_results
-    WHERE student_code=%s GROUP BY exam_name
+    WHERE student_code=%s
+    GROUP BY exam_name
+    ORDER BY exam_name
     """, conn, params=(st.session_state.user,))
-    st.dataframe(scores)
 
     conn.close()
+
+    st.subheader("👤 ข้อมูลนักเรียน")
+    col1,col2 = st.columns(2)
+    col1.metric("รหัสนักศึกษา", st.session_state.user)
+    col2.metric("ชื่อ-สกุล", st.session_state.student_name)
+
+    st.divider()
+
+    if not df.empty:
+        df["เปอร์เซ็นต์"] = (df["score"]/df["total_questions"])*100
+
+        st.subheader("📈 สรุปผลรวม")
+        c1,c2,c3 = st.columns(3)
+        c1.metric("จำนวนแบบฝึก", len(df))
+        c2.metric("คะแนนเฉลี่ย", f"{df['เปอร์เซ็นต์'].mean():.2f}%")
+        c3.metric("คะแนนสูงสุด", f"{df['เปอร์เซ็นต์'].max():.2f}%")
+
+        st.divider()
+
+        st.subheader("📄 ประวัติการสอบ")
+        st.dataframe(df,use_container_width=True)
+
+        st.subheader("📊 กราฟคะแนนย้อนหลัง")
+        st.line_chart(df.set_index("exam_name")["เปอร์เซ็นต์"])
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "⬇️ ดาวน์โหลดผลสอบ",
+            data=csv,
+            file_name="my_scores.csv",
+            mime="text/csv"
+        )
+
+        if df["เปอร์เซ็นต์"].mean() < 50:
+            st.error("⚠️ คะแนนเฉลี่ยต่ำกว่า 50 ควรปรับปรุง")
+
+    else:
+        st.info("ยังไม่มีประวัติการสอบ")
 
 # ================= DASHBOARD TEACHER =================
 def teacher_dashboard():
