@@ -24,6 +24,39 @@ if "logged_in" not in st.session_state:
     st.session_state.user = ""
     st.session_state.student_name = ""
 
+def init_db():
+    conn = connect_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS students(
+        student_code VARCHAR(50) PRIMARY KEY,
+        password VARCHAR(100),
+        full_name VARCHAR(200),
+        role VARCHAR(20),
+        faculty VARCHAR(200),
+        major VARCHAR(200),
+        class_group VARCHAR(50),
+        year_level VARCHAR(20)
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS exam_results(
+        id SERIAL PRIMARY KEY,
+        student_code VARCHAR(50),
+        exam_name VARCHAR(100),
+        question_no INT,
+        predicted_answer VARCHAR(50),
+        correct_answer VARCHAR(50),
+        is_correct BOOLEAN
+    )
+    """)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
     f"Exercise {i}": {j: str(j*j) for j in range(1,11)}
@@ -100,21 +133,30 @@ def register_page():
         pw = st.text_input("Password", type="password")
         name = st.text_input("ชื่อ-สกุล")
 
+        faculty = st.text_input("คณะ")
+        major = st.text_input("สาขา")
+        class_group = st.text_input("กลุ่มเรียน")
+        year_level = st.selectbox("ชั้นปี", ["1","2","3","4"])
+
         if st.form_submit_button("สมัคร"):
             cur.execute("SELECT * FROM students WHERE student_code=%s",(code,))
             if cur.fetchone():
                 st.error("Username ซ้ำ")
             else:
                 cur.execute("""
-                INSERT INTO students(student_code,password,full_name,role)
-                VALUES(%s,%s,%s,%s)
-                """,(code,pw,name,role))
+                INSERT INTO students
+                (student_code,password,full_name,role,
+                 faculty,major,class_group,year_level)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (code,pw,name,role,
+                 faculty,major,class_group,year_level))
+
                 conn.commit()
                 st.success("สมัครสำเร็จ 🎉")
 
     cur.close()
     conn.close()
-
 # ================= LOGIN =================
 def login_page():
     st.title("🔐 Login")
@@ -206,6 +248,15 @@ def dashboard():
 
     conn = connect_db()
 
+    # ================= โหลดข้อมูลนักเรียน =================
+    student_info = pd.read_sql("""
+        SELECT full_name, faculty, major,
+               class_group, year_level
+        FROM students
+        WHERE student_code=%s
+    """, conn, params=(st.session_state.user,))
+
+    # ================= โหลดคะแนน =================
     df = pd.read_sql("""
     SELECT exam_name,
     SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
@@ -218,13 +269,27 @@ def dashboard():
 
     conn.close()
 
-    st.subheader("👤 ข้อมูลนักเรียน")
-    col1,col2 = st.columns(2)
-    col1.metric("รหัสนักศึกษา", st.session_state.user)
-    col2.metric("ชื่อ-สกุล", st.session_state.student_name)
+    # ================= แสดงข้อมูลนักเรียน =================
+    st.subheader("👤 ข้อมูลนักศึกษา")
+
+    if not student_info.empty:
+        info = student_info.iloc[0]
+
+        col1, col2 = st.columns(2)
+        col1.metric("รหัสนักศึกษา", st.session_state.user)
+        col2.metric("ชื่อ-สกุล", info["full_name"])
+
+        col3, col4 = st.columns(2)
+        col3.metric("คณะ", info["faculty"] or "-")
+        col4.metric("สาขา", info["major"] or "-")
+
+        col5, col6 = st.columns(2)
+        col5.metric("กลุ่มเรียน", info["class_group"] or "-")
+        col6.metric("ชั้นปี", info["year_level"] or "-")
 
     st.divider()
 
+    # ================= สรุปคะแนน =================
     if not df.empty:
         df["เปอร์เซ็นต์"] = (df["score"]/df["total_questions"])*100
 
@@ -241,17 +306,6 @@ def dashboard():
 
         st.subheader("📊 กราฟคะแนนย้อนหลัง")
         st.line_chart(df.set_index("exam_name")["เปอร์เซ็นต์"])
-
-        csv = df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "⬇️ ดาวน์โหลดผลสอบ",
-            data=csv,
-            file_name="my_scores.csv",
-            mime="text/csv"
-        )
-
-        if df["เปอร์เซ็นต์"].mean() < 50:
-            st.error("⚠️ คะแนนเฉลี่ยต่ำกว่า 50 ควรปรับปรุง")
 
     else:
         st.info("ยังไม่มีประวัติการสอบ")
