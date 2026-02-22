@@ -32,6 +32,15 @@ def init_db():
     ADD COLUMN IF NOT EXISTS year_level VARCHAR(20);
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS answer_keys(
+        id SERIAL PRIMARY KEY,
+        exam_name VARCHAR(100),
+        question_no INT,
+        correct_answer VARCHAR(50)
+    );
+    """)
+
     # 3️⃣ สร้างตารางผลสอบ
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exam_results(
