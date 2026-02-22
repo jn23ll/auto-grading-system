@@ -13,33 +13,31 @@ def init_db():
     conn = connect_db()
     cur = conn.cursor()
 
-    # 👨‍🎓 STUDENTS + TEACHERS TABLE
     cur.execute("""
     CREATE TABLE IF NOT EXISTS students(
-        id SERIAL PRIMARY KEY,
-        student_code TEXT UNIQUE,
-        password TEXT,
-        full_name TEXT,
-        faculty TEXT,
-        major TEXT,
-        class_group TEXT,
-        role TEXT
+        student_code VARCHAR(50) PRIMARY KEY,
+        password VARCHAR(100),
+        full_name VARCHAR(200),
+        role VARCHAR(20),
+        faculty VARCHAR(200),
+        major VARCHAR(200),
+        class_group VARCHAR(50),
+        year_level VARCHAR(20)
     )
     """)
 
-    # 📄 RESULTS TABLE
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exam_results(
         id SERIAL PRIMARY KEY,
-        student_code TEXT,
-        exam_name TEXT,
+        student_code VARCHAR(50),
+        exam_name VARCHAR(100),
         question_no INT,
-        predicted_answer TEXT,
-        correct_answer TEXT,
-        is_correct BOOLEAN,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        predicted_answer VARCHAR(50),
+        correct_answer VARCHAR(50),
+        is_correct BOOLEAN
     )
     """)
 
     conn.commit()
+    cur.close()
     conn.close()
