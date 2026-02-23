@@ -13,17 +13,16 @@ def init_db():
     conn = connect_db()
     cur = conn.cursor()
 
-    # 1️⃣ สร้างตาราง students ก่อน (ถ้ายังไม่มี)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS students(
         student_code VARCHAR(50) PRIMARY KEY,
-        password VARCHAR(100),
-        full_name VARCHAR(200),
-        role VARCHAR(20)
+        password VARCHAR(100) NOT NULL,
+        full_name VARCHAR(200) NOT NULL,
+        role VARCHAR(20) DEFAULT 'student',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
-    # 2️⃣ เพิ่ม column ถ้ายังไม่มี (migration)
     cur.execute("""
     ALTER TABLE students
     ADD COLUMN IF NOT EXISTS faculty VARCHAR(200),
@@ -41,16 +40,26 @@ def init_db():
     );
     """)
 
-    # 3️⃣ สร้างตารางผลสอบ
     cur.execute("""
     CREATE TABLE IF NOT EXISTS exam_results(
         id SERIAL PRIMARY KEY,
-        student_code VARCHAR(50),
+        student_code VARCHAR(50) REFERENCES students(student_code),
         exam_name VARCHAR(100),
         question_no INT,
         predicted_answer VARCHAR(50),
         correct_answer VARCHAR(50),
-        is_correct BOOLEAN
+        is_correct BOOLEAN,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS attendance(
+        id SERIAL PRIMARY KEY,
+        student_code VARCHAR(50) REFERENCES students(student_code),
+        date DATE DEFAULT CURRENT_DATE,
+        status VARCHAR(10) CHECK (status IN ('present','absent')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
