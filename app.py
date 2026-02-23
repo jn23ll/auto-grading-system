@@ -301,20 +301,54 @@ def ocr_page():
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกคะแนนเรียบร้อยแล้ว")
 
+# ================= GRADE SYSTEM =================
+def calculate_grade(percent):
+    if percent >= 80:
+        return "A"
+    elif percent >= 70:
+        return "B"
+    elif percent >= 60:
+        return "C"
+    elif percent >= 50:
+        return "D"
+    return "F"
+
+def calculate_status(percent):
+    return "ผ่าน" if percent >= 50 else "ไม่ผ่าน"
+
+def get_class_average():
+    conn = connect_db()
+    df = pd.read_sql("""
+        SELECT student_code,
+        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
+        COUNT(question_no) as total
+        FROM exam_results
+        GROUP BY student_code
+    """, conn)
+    conn.close()
+
+    if df.empty:
+        return 0
+
+    df["percent"] = (df["score"] / df["total"]) * 100
+    return round(df["percent"].mean(), 2)
+    
 # ================= DASHBOARD =================
 def dashboard():
     st.title("🎓 Academic Dashboard")
     conn = connect_db()
 
-    if st.session_state.role=="student":
-        student_code=st.session_state.user
+    # ================= STUDENT DASHBOARD =================
+    if st.session_state.role == "student":
 
-        info=pd.read_sql(
+        student_code = st.session_state.user
+
+        info = pd.read_sql(
             "SELECT * FROM students WHERE student_code=%s",
-            conn,params=(student_code,)
+            conn, params=(student_code,)
         )
 
-        scores=pd.read_sql("""
+        scores = pd.read_sql("""
             SELECT exam_name,
             SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
             COUNT(question_no) as total
@@ -322,17 +356,26 @@ def dashboard():
             WHERE student_code=%s
             GROUP BY exam_name
             ORDER BY exam_name
-        """,conn,params=(student_code,))
+        """, conn, params=(student_code,))
+
+        # ดึงค่าเฉลี่ยทั้งห้อง
+        class_df = pd.read_sql("""
+            SELECT student_code,
+            SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
+            COUNT(question_no) as total
+            FROM exam_results
+            GROUP BY student_code
+        """, conn)
 
         try:
-            attendance=pd.read_sql("""
+            attendance = pd.read_sql("""
                 SELECT COUNT(*) as total_days,
                 SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) as present_days
                 FROM attendance
                 WHERE student_code=%s
-            """,conn,params=(student_code,))
+            """, conn, params=(student_code,))
         except:
-            attendance=None
+            attendance = None
 
         conn.close()
 
@@ -340,83 +383,127 @@ def dashboard():
             st.error("ไม่พบข้อมูลนักศึกษา")
             return
 
+        # ---------- PROFILE ----------
         st.subheader("👤 Student Profile")
-        col1,col2=st.columns(2)
-        col1.metric("Student Code",student_code)
-        col2.metric("Full Name",info["full_name"].iloc[0])
+        col1, col2 = st.columns(2)
+        col1.metric("Student Code", student_code)
+        col2.metric("Full Name", info["full_name"].iloc[0])
 
+        # ---------- SUMMARY ----------
         st.subheader("📊 Academic Summary")
-        total_exams=len(scores)
+        total_exams = len(scores)
 
-        if total_exams>0:
-            scores["percentage"]=scores.apply(
-                lambda r:(r["score"]/r["total"])*100 if r["total"]>0 else 0,
-                axis=1)
-            avg_score=round(scores["percentage"].mean(),2)
+        if total_exams > 0:
+            scores["percentage"] = scores.apply(
+                lambda r: (r["score"] / r["total"]) * 100 if r["total"] > 0 else 0,
+                axis=1
+            )
+            avg_score = round(scores["percentage"].mean(), 2)
         else:
-            avg_score=0
+            avg_score = 0
 
-        col1,col2,col3=st.columns(3)
-        col1.metric("Exams Taken",total_exams)
-        col2.metric("Average Score (%)",f"{avg_score}%")
+        # ค่าเฉลี่ยห้อง
+        if not class_df.empty:
+            class_df["percentage"] = class_df.apply(
+                lambda r: (r["score"] / r["total"]) * 100 if r["total"] > 0 else 0,
+                axis=1
+            )
+            class_avg = round(class_df["percentage"].mean(), 2)
+        else:
+            class_avg = 0
 
+        grade = calculate_grade(avg_score)
+        status = calculate_status(avg_score)
+        diff = round(avg_score - class_avg, 2)
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        col1.metric("Exams Taken", total_exams)
+        col2.metric("Average (%)", f"{avg_score}%")
+        col3.metric("Grade", grade)
+        col4.metric("เทียบค่าเฉลี่ยห้อง", f"{diff:+.2f}%")
+
+        # Attendance
         if attendance is not None and not attendance.empty:
-            td=attendance["total_days"].iloc[0]
-            pdays=attendance["present_days"].iloc[0]
-            percent_att=round((pdays/td)*100,2) if td and td>0 else 0
-            col3.metric("Attendance (%)",f"{percent_att}%")
+            td = attendance["total_days"].iloc[0]
+            pdays = attendance["present_days"].iloc[0]
+            percent_att = round((pdays / td) * 100, 2) if td and td > 0 else 0
+            col5.metric("Attendance (%)", f"{percent_att}%")
         else:
-            col3.metric("Attendance (%)","-")
+            col5.metric("Attendance (%)", "-")
 
+        st.info(f"สถานะการเรียน: {status}")
+
+        # ---------- TREND ----------
         st.subheader("📈 Performance Trend")
-        if total_exams>0:
+        if total_exams > 0:
             st.line_chart(scores.set_index("exam_name")["percentage"])
         else:
             st.info("ยังไม่มีข้อมูลคะแนน")
 
+        # ---------- HISTORY ----------
         st.subheader("📋 Exam History")
-        if total_exams>0:
-            st.dataframe(scores,use_container_width=True)
+        if total_exams > 0:
+            st.dataframe(scores, use_container_width=True)
         else:
             st.info("ยังไม่มีประวัติการสอบ")
 
-    elif st.session_state.role=="teacher":
+    # ================= TEACHER DASHBOARD =================
+    elif st.session_state.role == "teacher":
+
         st.subheader("👩‍🏫 Teacher Overview")
 
-        df=pd.read_sql("""
+        df = pd.read_sql("""
             SELECT student_code,
             exam_name,
             SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
             COUNT(question_no) as total
             FROM exam_results
             GROUP BY student_code, exam_name
-        """,conn)
+        """, conn)
+
         conn.close()
 
         if df.empty:
             st.info("ยังไม่มีข้อมูลคะแนน")
             return
 
-        df["percentage"]=df.apply(
-            lambda r:(r["score"]/r["total"])*100 if r["total"]>0 else 0,
-            axis=1)
+        df["percentage"] = df.apply(
+            lambda r: (r["score"] / r["total"]) * 100 if r["total"] > 0 else 0,
+            axis=1
+        )
 
+        # ---------- CLASS SUMMARY ----------
         st.subheader("📊 Class Summary")
-        total_students=df["student_code"].nunique()
-        avg_score=round(df["percentage"].mean(),2)
+        total_students = df["student_code"].nunique()
+        class_avg = round(df["percentage"].mean(), 2)
 
-        col1,col2=st.columns(2)
-        col1.metric("Total Students",total_students)
-        col2.metric("Class Average (%)",f"{avg_score}%")
+        col1, col2 = st.columns(2)
+        col1.metric("Total Students", total_students)
+        col2.metric("Class Average (%)", f"{class_avg}%")
 
-        st.subheader("🏆 Top 5 Students")
-        ranking=df.groupby("student_code")["percentage"].mean().reset_index()
-        ranking=ranking.sort_values(by="percentage",ascending=False).head(5)
-        st.dataframe(ranking,use_container_width=True)
+        # ---------- ADD GRADE & STATUS ----------
+        df["grade"] = df["percentage"].apply(calculate_grade)
+        df["status"] = df["percentage"].apply(calculate_status)
 
+        # ---------- RANKING ----------
+        st.subheader("🏆 Ranking")
+        ranking = df.groupby("student_code")["percentage"].mean().reset_index()
+        ranking = ranking.sort_values(by="percentage", ascending=False)
+        ranking["Rank"] = ranking.index + 1
+        ranking["grade"] = ranking["percentage"].apply(calculate_grade)
+
+        st.dataframe(ranking, use_container_width=True)
+
+        # ---------- DISTRIBUTION ----------
         st.subheader("📈 Score Distribution")
-        st.bar_chart(df.groupby("student_code")["percentage"].mean())
+        distribution = ranking.set_index("student_code")["percentage"]
+        st.bar_chart(distribution)
 
+        # ---------- FULL TABLE ----------
+        st.subheader("📋 Detailed Results")
+        st.dataframe(df, use_container_width=True)
+        
 # ================= MAIN =================
 def main():
     st.sidebar.title("📌 เมนู")
