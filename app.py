@@ -13,36 +13,81 @@ st.set_page_config(
     layout="wide"
 )
 
+# ================= UNIVERSITY THEME =================
 st.markdown("""
 <style>
-.main {
-    background-color: #f4f6fb;
+
+/* --------- พื้นหลังหลัก --------- */
+.stApp {
+    background-color: #f5f7fa;
 }
 
-h1, h2, h3 {
-    color: #1f4e79;
-    font-weight: 700;
-}
-
-.stButton>button {
-    background-color: #1f77b4;
+/* --------- Header --------- */
+.main-header {
+    text-align: center;
+    padding: 15px 0;
+    background: linear-gradient(90deg, #0b3d91, #1f4e79);
     color: white;
-    border-radius: 8px;
-    padding: 8px 20px;
-    font-weight: 600;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 
-.stButton>button:hover {
-    background-color: #125d99;
-    color: white;
+.main-header h1 {
+    margin-bottom: 5px;
+}
+
+.main-header p {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* --------- Sidebar --------- */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0b3d91, #163b5c);
+}
+
+[data-testid="stSidebar"] * {
+    color: white !important;
+}
+
+/* --------- Card --------- */
+.block-container {
+    padding-top: 2rem;
 }
 
 div[data-testid="metric-container"] {
     background-color: white;
-    padding: 15px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
+
+/* --------- Buttons --------- */
+.stButton>button {
+    background-color: #0b3d91;
+    color: white;
+    border-radius: 8px;
+    border: none;
+    padding: 8px 20px;
+    font-weight: bold;
+}
+
+.stButton>button:hover {
+    background-color: #092e6e;
+    color: white;
+}
+
+/* --------- Success / Error --------- */
+.stAlert-success {
+    background-color: #e6f4ea;
+    color: #1e4620;
+}
+
+.stAlert-error {
+    background-color: #fdecea;
+    color: #611a15;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
