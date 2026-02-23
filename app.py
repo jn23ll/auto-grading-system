@@ -235,14 +235,11 @@ def ocr_page():
     if file:
         image = Image.open(file).convert("RGB")
         img = np.array(image)
-        orig_h, orig_w = img.shape[:2]
 
-        # ขนาดต้นฉบับที่ใช้กำหนดพิกัด (สำคัญ!)
         BASE_W = 1240
         BASE_H = 1754
 
         orig_h, orig_w = img.shape[:2]
-
         scale_x = orig_w / BASE_W
         scale_y = orig_h / BASE_H
 
@@ -260,7 +257,6 @@ def ocr_page():
         ]
 
         display_boxes = []
-
         for (x1,y1,x2,y2) in base_boxes:
             display_boxes.append((
                 int(x1 * scale_x),
@@ -269,37 +265,33 @@ def ocr_page():
                 int(y2 * scale_y),
             ))
 
-        for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
-            x1 = max(0,min(x1,orig_w-1))
-            x2 = max(0,min(x2,orig_w))
-            y1 = max(0,min(y1,orig_h-1))
-            y2 = max(0,min(y2,orig_h))
+        # ✅ เพิ่มสองบรรทัดนี้
+        results = {}
+        score = 0
 
-            if x2<=x1 or y2<=y1:
-                results[i]=""
-                continue
+        for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
 
             roi = img[y1:y2,x1:x2]
-            if roi.size==0:
-                results[i]=""
+            if roi.size == 0:
+                results[i] = ""
                 continue
 
             hand = crop_handwriting_zone(roi)
-            if hand.size==0:
-                results[i]=""
+            if hand.size == 0:
+                results[i] = ""
                 continue
 
-            gray=cv2.cvtColor(hand,cv2.COLOR_BGR2GRAY)
-            gray=cv2.GaussianBlur(gray,(5,5),0)
-            _,gray=cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            # ✅ ไม่ต้อง threshold ตรงนี้
+            gray = cv2.cvtColor(hand, cv2.COLOR_BGR2GRAY)
 
-            pred=read_digit_easyocr(gray)
-            results[i]=pred
-            correct=ANSWER_KEYS[exam][i]
+            pred = read_digit_easyocr(gray)
+            results[i] = pred
 
-            if is_equal(pred,correct):
+            correct = ANSWER_KEYS[exam][i]
+
+            if is_equal(pred, correct):
                 st.success(f"ข้อ {i}: {pred} ✓")
-                score+=1
+                score += 1
             else:
                 st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
 
