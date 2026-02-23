@@ -209,7 +209,7 @@ def login_page():
 
 # ================= MAIN =================
 def main():
-    st.sidebar.title("🏛 University System")
+    st.sidebar.title("🏛 Prince of Songkla University")
 
     if not st.session_state.logged_in:
         login_page()
