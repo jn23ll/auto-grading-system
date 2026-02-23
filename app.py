@@ -13,6 +13,31 @@ st.set_page_config(
     layout="wide"
 )
 
+# ================= VERIFY EMAIL =================
+query_params = st.query_params
+
+if "verify" in query_params:
+    token = query_params["verify"]
+
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM teachers WHERE verify_token=%s",(token,))
+    user = cursor.fetchone()
+
+    if user:
+        cursor.execute("""
+            UPDATE teachers 
+            SET verified=TRUE, verify_token=NULL 
+            WHERE verify_token=%s
+        """,(token,))
+        conn.commit()
+        st.success("ยืนยันอีเมลสำเร็จ ✅ สามารถ Login ได้แล้ว")
+    else:
+        st.error("Token ไม่ถูกต้อง")
+
+    conn.close()
+    
 # ================= UNIVERSITY THEME =================
 st.markdown("""
 <style>
@@ -175,6 +200,30 @@ def register_page():
     conn.close()
 
 # ================= TEACHER REGISTER =================
+import bcrypt
+import uuid
+import smtplib
+from email.mime.text import MIMEText
+
+def send_verification_email(email, token):
+    verify_link = f"http://localhost:8501/?verify={token}"
+
+    msg = MIMEText(f"""
+กรุณายืนยันอีเมลของคุณโดยกดลิงก์ด้านล่าง:
+
+{verify_link}
+""")
+    msg["Subject"] = "Verify Your University Account"
+    msg["From"] = "your_email@gmail.com"
+    msg["To"] = email
+
+    # ใช้ Gmail SMTP (ต้องเปิด App Password)
+    server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    server.login("your_email@gmail.com", "YOUR_APP_PASSWORD")
+    server.sendmail(msg["From"], [email], msg.as_string())
+    server.quit()
+
+
 def register_teacher():
     st.title("👩‍🏫 สมัครสมาชิกอาจารย์")
 
@@ -184,31 +233,32 @@ def register_teacher():
 
     if st.button("สมัครสมาชิก"):
         if not full_name or not email or not password:
-            st.warning("กรุณากรอกข้อมูลให้ครบ")
+            st.warning("กรอกข้อมูลให้ครบ")
             return
 
         conn = connect_db()
         cursor = conn.cursor()
 
-        # ตรวจสอบอีเมลซ้ำ
         cursor.execute("SELECT * FROM teachers WHERE email=%s", (email,))
-        exists = cursor.fetchone()
-
-        if exists:
+        if cursor.fetchone():
             st.error("อีเมลนี้ถูกใช้งานแล้ว")
             conn.close()
             return
 
-        # บันทึกข้อมูล
+        hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        token = str(uuid.uuid4())
+
         cursor.execute("""
-            INSERT INTO teachers (full_name, email, password)
-            VALUES (%s, %s, %s)
-        """, (full_name, email, password))
+            INSERT INTO teachers (full_name,email,password,verify_token)
+            VALUES (%s,%s,%s,%s)
+        """,(full_name,email,hashed_pw,token))
 
         conn.commit()
         conn.close()
 
-        st.success("สมัครสมาชิกสำเร็จ 🎉")
+        send_verification_email(email, token)
+
+        st.success("สมัครสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี 📧")
         
 # ================= LOGIN =================
 def login_page():
@@ -236,6 +286,42 @@ def login_page():
             st.rerun()
         else:
             st.error("ข้อมูลไม่ถูกต้อง")
+
+# ================= LOGIN =================
+def login():
+    st.title("🔐 Login")
+
+    email = st.text_input("อีเมล")
+    password = st.text_input("รหัสผ่าน", type="password")
+
+    if st.button("เข้าสู่ระบบ"):
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM teachers WHERE email=%s",(email,))
+        user = cursor.fetchone()
+
+        conn.close()
+
+        if not user:
+            st.error("ไม่พบผู้ใช้")
+            return
+
+        db_password = user[3]      # column password
+        verified = user[4]         # column verified
+
+        if not verified:
+            st.warning("กรุณายืนยันอีเมลก่อนใช้งาน")
+            return
+
+        if bcrypt.checkpw(password.encode(), db_password.encode()):
+            st.session_state.logged_in = True
+            st.session_state.role = "teacher"
+            st.session_state.user_email = email
+            st.success("เข้าสู่ระบบสำเร็จ 🎉")
+            st.rerun()
+        else:
+            st.error("รหัสผ่านไม่ถูกต้อง")
 
 # ================= SAVE RESULTS =================
 def save_results(student_code, exam_name, results):
@@ -539,6 +625,58 @@ def dashboard():
         # ---------- FULL TABLE ----------
         st.subheader("📋 Detailed Results")
         st.dataframe(df, use_container_width=True)
+
+def teacher_dashboard():
+    st.title("👩‍🏫 Teacher Dashboard")
+
+    email = st.session_state.user_email
+
+    conn = connect_db()
+
+    teacher = pd.read_sql(
+        "SELECT full_name FROM teachers WHERE email=%s",
+        conn, params=(email,)
+    )
+
+    st.subheader(f"Welcome, {teacher['full_name'].iloc[0]}")
+
+    df = pd.read_sql("""
+        SELECT student_code,
+        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
+        COUNT(question_no) as total
+        FROM exam_results
+        GROUP BY student_code
+    """,conn)
+
+    conn.close()
+
+    if df.empty:
+        st.info("ยังไม่มีข้อมูลคะแนน")
+        return
+
+    df["percentage"] = (df["score"]/df["total"])*100
+    st.dataframe(df, use_container_width=True)
+
+    st.bar_chart(df.set_index("student_code")["percentage"])
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    menu = st.sidebar.selectbox("Menu", ["Login","Register Teacher"])
+    
+    if menu == "Login":
+        login()
+    else:
+        register_teacher()
+
+else:
+    if st.session_state.role == "teacher":
+        teacher_dashboard()
+
+    if st.sidebar.button("Logout"):
+        st.session_state.clear()
+        st.rerun()
         
 # ================= MAIN =================
 def main():
