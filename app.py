@@ -174,6 +174,42 @@ def register_page():
     cur.close()
     conn.close()
 
+# ================= TEACHER REGISTER =================
+def register_teacher():
+    st.title("👩‍🏫 สมัครสมาชิกอาจารย์")
+
+    full_name = st.text_input("ชื่อ–สกุล")
+    email = st.text_input("อีเมล")
+    password = st.text_input("รหัสผ่าน", type="password")
+
+    if st.button("สมัครสมาชิก"):
+        if not full_name or not email or not password:
+            st.warning("กรุณากรอกข้อมูลให้ครบ")
+            return
+
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        # ตรวจสอบอีเมลซ้ำ
+        cursor.execute("SELECT * FROM teachers WHERE email=%s", (email,))
+        exists = cursor.fetchone()
+
+        if exists:
+            st.error("อีเมลนี้ถูกใช้งานแล้ว")
+            conn.close()
+            return
+
+        # บันทึกข้อมูล
+        cursor.execute("""
+            INSERT INTO teachers (full_name, email, password)
+            VALUES (%s, %s, %s)
+        """, (full_name, email, password))
+
+        conn.commit()
+        conn.close()
+
+        st.success("สมัครสมาชิกสำเร็จ 🎉")
+        
 # ================= LOGIN =================
 def login_page():
     st.title("🔐 Login")
