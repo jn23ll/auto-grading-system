@@ -658,47 +658,72 @@ def teacher_dashboard():
     st.dataframe(df, use_container_width=True)
 
     st.bar_chart(df.set_index("student_code")["percentage"])
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    menu = st.sidebar.selectbox("Menu", ["Login","Register Teacher"])
-    
-    if menu == "Login":
-        login()
-    else:
-        register_teacher()
-
-else:
-    if st.session_state.role == "teacher":
-        teacher_dashboard()
-
-    if st.sidebar.button("Logout"):
-        st.session_state.clear()
-        st.rerun()
         
 # ================= MAIN =================
+# ================= MAIN =================
 def main():
+
     st.sidebar.title("📌 เมนู")
 
+    # ---------- ยังไม่ Login ----------
     if not st.session_state.logged_in:
-        menu=st.sidebar.radio("",["🔐 Login","📝 Register"])
-        if menu=="🔐 Login": login_page()
-        if menu=="📝 Register": register_page()
+
+        menu = st.sidebar.radio(
+            "",
+            ["🔐 Login นักศึกษา",
+             "🔐 Login อาจารย์",
+             "📝 สมัครนักศึกษา",
+             "👩‍🏫 สมัครอาจารย์"]
+        )
+
+        if menu == "🔐 Login นักศึกษา":
+            login_page()
+
+        elif menu == "🔐 Login อาจารย์":
+            login()
+
+        elif menu == "📝 สมัครนักศึกษา":
+            register_page()
+
+        elif menu == "👩‍🏫 สมัครอาจารย์":
+            register_teacher()
+
+    # ---------- Login แล้ว ----------
     else:
-        if st.session_state.role=="student":
-            menu=st.sidebar.radio("",["📊 Dashboard","📄 ตรวจข้อสอบ","🚪 Logout"])
-            if menu=="📊 Dashboard": dashboard()
-            if menu=="📄 ตรวจข้อสอบ": ocr_page()
-            if menu=="🚪 Logout":
+
+        # ===== STUDENT =====
+        if st.session_state.role == "student":
+
+            menu = st.sidebar.radio(
+                "",
+                ["📊 Dashboard",
+                 "📄 ตรวจข้อสอบ",
+                 "🚪 Logout"]
+            )
+
+            if menu == "📊 Dashboard":
+                dashboard()
+
+            elif menu == "📄 ตรวจข้อสอบ":
+                ocr_page()
+
+            elif menu == "🚪 Logout":
                 st.session_state.clear()
                 st.rerun()
 
-        if st.session_state.role=="teacher":
-            menu=st.sidebar.radio("",["👩‍🏫 Teacher Overview","🚪 Logout"])
-            if menu=="👩‍🏫 Teacher Overview": dashboard()
-            if menu=="🚪 Logout":
+        # ===== TEACHER =====
+        elif st.session_state.role == "teacher":
+
+            menu = st.sidebar.radio(
+                "",
+                ["👩‍🏫 Teacher Dashboard",
+                 "🚪 Logout"]
+            )
+
+            if menu == "👩‍🏫 Teacher Dashboard":
+                dashboard()
+
+            elif menu == "🚪 Logout":
                 st.session_state.clear()
                 st.rerun()
 
