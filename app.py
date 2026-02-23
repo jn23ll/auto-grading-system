@@ -9,12 +9,12 @@ from database import init_db, connect_db
 
 st.set_page_config(
     page_title="Auto Grading System",
-    page_icon="📚"
+    page_icon="📚",
     layout="wide"
 )
+
 st.markdown("""
 <style>
-
 .main {
     background-color: #f4f6fb;
 }
@@ -43,12 +43,6 @@ div[data-testid="metric-container"] {
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
-
-.sidebar .sidebar-content {
-    background-color: #1f4e79;
-    color: white;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -68,7 +62,7 @@ if "logged_in" not in st.session_state:
     st.session_state.role = ""
     st.session_state.user = ""
     st.session_state.student_name = ""
-    
+
 # ================= ANSWER KEYS =================
 ANSWER_KEYS = {
 "Exercise 1": {1:"1690",2:"18.42",3:"27820",4:"75",5:"30",6:"16416",7:"2258",8:"3960",9:"1463",10:"5200"},
@@ -99,7 +93,7 @@ def is_equal(a, b):
         return float(a) == float(b)
     except:
         return False
-        
+
 # ================= EASY OCR FUNCTION =================
 def read_digit_easyocr(gray):
     if gray is None or gray.size == 0:
@@ -134,7 +128,6 @@ def read_digit_easyocr(gray):
             return clean_text(match.group())
 
         return ""
-
     except:
         return ""
 
@@ -158,7 +151,6 @@ def register_page():
         code = st.text_input("Username / รหัส")
         pw = st.text_input("Password", type="password")
         name = st.text_input("ชื่อ-สกุล")
-
         faculty = st.text_input("คณะ")
         major = st.text_input("สาขา")
         class_group = st.text_input("กลุ่มเรียน")
@@ -178,17 +170,15 @@ def register_page():
                 (code, pw, name, role,
                  faculty, major, class_group, year_level)
                 )
-
                 conn.commit()
                 st.success("สมัครสำเร็จ 🎉")
 
     cur.close()
     conn.close()
-    
+
 # ================= LOGIN =================
 def login_page():
     st.title("🔐 Login")
-
     code = st.text_input("Username / รหัสนักศึกษา")
     pw = st.text_input("Password", type="password")
 
@@ -218,7 +208,6 @@ def save_results(student_code, exam_name, results):
     conn = connect_db()
     cur = conn.cursor()
 
-    # 🔹 ลบข้อมูลเดิมก่อน (กันบันทึกซ้ำ)
     cur.execute("""
         DELETE FROM exam_results
         WHERE student_code=%s AND exam_name=%s
@@ -226,7 +215,6 @@ def save_results(student_code, exam_name, results):
 
     for q, pred in results.items():
         correct = ANSWER_KEYS[exam_name][q]
-
         cur.execute("""
         INSERT INTO exam_results
         (student_code, exam_name, question_no,
@@ -250,12 +238,8 @@ def ocr_page():
     if file:
         image = Image.open(file).convert("RGB")
         img = np.array(image)
-
         orig_h, orig_w = img.shape[:2]
 
-        # -------------------------------
-        # กำหนดตำแหน่งกรอบ (ไม่ซ้ำกัน)
-        # -------------------------------
         display_boxes = [
             (625,243,788,311),
             (622,309,785,382),
@@ -273,28 +257,22 @@ def ocr_page():
         score = 0
 
         for i, (x1, y1, x2, y2) in enumerate(display_boxes, 1):
-
             x1 = max(0, min(x1, orig_w-1))
             x2 = max(0, min(x2, orig_w))
             y1 = max(0, min(y1, orig_h-1))
             y2 = max(0, min(y2, orig_h))
 
             if x2 <= x1 or y2 <= y1:
-                st.error(f"ข้อ {i}: พิกัดผิด")
                 results[i] = ""
                 continue
 
             roi = img[y1:y2, x1:x2]
             if roi.size == 0:
-                st.error(f"ข้อ {i}: crop ไม่สำเร็จ")
                 results[i] = ""
                 continue
 
             hand = crop_handwriting_zone(roi)
-            st.image(hand, caption=f"Crop ข้อ {i}")  # 🔍 debug
-
             if hand.size == 0:
-                st.error(f"ข้อ {i}: handwriting zone ว่าง")
                 results[i] = ""
                 continue
 
@@ -314,10 +292,11 @@ def ocr_page():
                 st.error(f"ข้อ {i}: {pred if pred else '-'} ✗ | ตอบ {correct}")
 
         st.subheader(f"🎯 คะแนนรวม {score}/10")
+
         if st.button("บันทึกคะแนน"):
             save_results(st.session_state.user, exam, results)
             st.success("บันทึกคะแนนเรียบร้อยแล้ว")
-            
+
 # ================= DASHBOARD STUDENT =================
 def dashboard():
     st.title("📊 Dashboard นักศึกษา")
@@ -325,35 +304,13 @@ def dashboard():
     conn = connect_db()
     cur = conn.cursor()
 
-    # -------------------------------
-    # ตรวจสอบว่า column ไหนมีอยู่จริง
-    # -------------------------------
     cur.execute("""
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'students'
-    """)
-    existing_columns = [row[0] for row in cur.fetchall()]
-
-    fields = ["full_name"]
-    optional_fields = ["faculty","major","class_group","year_level"]
-
-    for col in optional_fields:
-        if col in existing_columns:
-            fields.append(col)
-
-    query = f"""
-        SELECT {', '.join(fields)}
+        SELECT full_name, faculty, major, class_group, year_level
         FROM students
         WHERE student_code=%s
-    """
+    """,(st.session_state.user,))
+    student_info = cur.fetchone()
 
-    student_info = pd.read_sql(query, conn,
-                               params=(st.session_state.user,))
-
-    # -------------------------------
-    # โหลดคะแนน
-    # -------------------------------
     df = pd.read_sql("""
         SELECT exam_name,
         SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as score,
@@ -366,74 +323,21 @@ def dashboard():
 
     conn.close()
 
-    # -------------------------------
-    # แสดงข้อมูลนักศึกษา
-    # -------------------------------
-    st.subheader("👤 ข้อมูลนักศึกษา")
-
-    if not student_info.empty:
-        info = student_info.iloc[0]
-
+    if student_info:
+        full_name, faculty, major, class_group, year_level = student_info
         col1, col2 = st.columns(2)
         col1.metric("รหัสนักศึกษา", st.session_state.user)
-        col2.metric("ชื่อ-สกุล", info.get("full_name","-"))
-
-        if "faculty" in info:
-            col3, col4 = st.columns(2)
-            col3.metric("คณะ", info.get("faculty","-"))
-            col4.metric("สาขา", info.get("major","-"))
-
-        if "class_group" in info:
-            col5, col6 = st.columns(2)
-            col5.metric("กลุ่มเรียน", info.get("class_group","-"))
-            col6.metric("ชั้นปี", info.get("year_level","-"))
+        col2.metric("ชื่อ-สกุล", full_name)
 
     st.divider()
 
-    # -------------------------------
-    # แสดงคะแนน
-    # -------------------------------
     if not df.empty:
         df["เปอร์เซ็นต์"] = (df["score"]/df["total_questions"])*100
-
-        c1,c2,c3 = st.columns(3)
-        c1.metric("จำนวนแบบฝึก", len(df))
-        c2.metric("คะแนนเฉลี่ย", f"{df['เปอร์เซ็นต์'].mean():.2f}%")
-        c3.metric("คะแนนสูงสุด", f"{df['เปอร์เซ็นต์'].max():.2f}%")
-
-        st.divider()
-        st.dataframe(df,use_container_width=True)
+        st.dataframe(df, use_container_width=True)
         st.line_chart(df.set_index("exam_name")["เปอร์เซ็นต์"])
-
     else:
         st.info("ยังไม่มีประวัติการสอบ")
 
-        st.markdown("""
-        <h1 style='text-align: center;'>
-        📚 ระบบตรวจข้อสอบอัตโนมัติ
-        </h1>
-        <p style='text-align: center; font-size:18px;'>
-        Auto Grading System with Attendance Tracking
-        </p>
-        """, unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
-
-        col1.metric("👥 จำนวนนักเรียน", total_students)
-        col2.metric("📊 คะแนนเฉลี่ย", avg_score)
-        col3.metric("📅 การมาเรียนเฉลี่ย", avg_attendance)
-        
-        st.subheader("📊 กราฟคะแนนรวม")
-
-        chart_data = {
-            "student": [s[0] for s in scores],
-            "score": [s[1] for s in scores]
-        }
-
-        import pandas as pd
-        df = pd.DataFrame(chart_data)
-
-        st.bar_chart(df.set_index("student"))
 # ================= DASHBOARD TEACHER =================
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
@@ -448,21 +352,25 @@ def main():
 
     if not st.session_state.logged_in:
         menu = st.sidebar.radio("",["🔐 Login","📝 Register"])
-        if menu=="🔐 Login": login_page()
-        if menu=="📝 Register": register_page()
-
+        if menu=="🔐 Login":
+            login_page()
+        if menu=="📝 Register":
+            register_page()
     else:
         if st.session_state.role=="student":
             menu=st.sidebar.radio("",["📊 Dashboard","📄 ตรวจข้อสอบ","🚪 Logout"])
-            if menu=="📊 Dashboard": dashboard()
-            if menu=="📄 ตรวจข้อสอบ": ocr_page()
+            if menu=="📊 Dashboard":
+                dashboard()
+            if menu=="📄 ตรวจข้อสอบ":
+                ocr_page()
             if menu=="🚪 Logout":
                 st.session_state.clear()
                 st.rerun()
 
         if st.session_state.role=="teacher":
             menu=st.sidebar.radio("",["👩‍🏫 Teacher Dashboard","🚪 Logout"])
-            if menu=="👩‍🏫 Teacher Dashboard": teacher_dashboard()
+            if menu=="👩‍🏫 Teacher Dashboard":
+                teacher_dashboard()
             if menu=="🚪 Logout":
                 st.session_state.clear()
                 st.rerun()
