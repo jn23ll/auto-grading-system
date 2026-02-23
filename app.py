@@ -7,6 +7,51 @@ import re
 from PIL import Image
 from database import init_db, connect_db
 
+st.set_page_config(
+    page_title="Auto Grading System",
+    page_icon="📚"
+    layout="wide"
+)
+st.markdown("""
+<style>
+
+.main {
+    background-color: #f4f6fb;
+}
+
+h1, h2, h3 {
+    color: #1f4e79;
+    font-weight: 700;
+}
+
+.stButton>button {
+    background-color: #1f77b4;
+    color: white;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-weight: 600;
+}
+
+.stButton>button:hover {
+    background-color: #125d99;
+    color: white;
+}
+
+div[data-testid="metric-container"] {
+    background-color: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.sidebar .sidebar-content {
+    background-color: #1f4e79;
+    color: white;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 # ================= LOAD EASY OCR =================
 @st.cache_resource
 def load_reader():
@@ -362,7 +407,33 @@ def dashboard():
 
     else:
         st.info("ยังไม่มีประวัติการสอบ")
+
+        st.markdown("""
+        <h1 style='text-align: center;'>
+        📚 ระบบตรวจข้อสอบอัตโนมัติ
+        </h1>
+        <p style='text-align: center; font-size:18px;'>
+        Auto Grading System with Attendance Tracking
+        </p>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("👥 จำนวนนักเรียน", total_students)
+        col2.metric("📊 คะแนนเฉลี่ย", avg_score)
+        col3.metric("📅 การมาเรียนเฉลี่ย", avg_attendance)
         
+        st.subheader("📊 กราฟคะแนนรวม")
+
+        chart_data = {
+            "student": [s[0] for s in scores],
+            "score": [s[1] for s in scores]
+        }
+
+        import pandas as pd
+        df = pd.DataFrame(chart_data)
+
+        st.bar_chart(df.set_index("student"))
 # ================= DASHBOARD TEACHER =================
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
