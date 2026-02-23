@@ -237,15 +237,37 @@ def ocr_page():
         img = np.array(image)
         orig_h, orig_w = img.shape[:2]
 
-        display_boxes = [
-            (625,243,788,311),(622,309,785,382),(624,384,784,448),
-            (622,454,805,529),(622,533,785,613),(624,619,783,685),
-            (622,689,785,754),(622,762,783,823),(622,830,783,895),
+        # ขนาดต้นฉบับที่ใช้กำหนดพิกัด (สำคัญ!)
+        BASE_W = 1240
+        BASE_H = 1754
+
+        orig_h, orig_w = img.shape[:2]
+
+        scale_x = orig_w / BASE_W
+        scale_y = orig_h / BASE_H
+
+        base_boxes = [
+            (625,243,788,311),
+            (622,309,785,382),
+            (624,384,784,448),
+            (622,454,805,529),
+            (622,533,785,613),
+            (624,619,783,685),
+            (622,689,785,754),
+            (622,762,783,823),
+            (622,830,783,895),
             (621,899,783,965),
         ]
 
-        results = {}
-        score = 0
+        display_boxes = []
+
+        for (x1,y1,x2,y2) in base_boxes:
+            display_boxes.append((
+                int(x1 * scale_x),
+                int(y1 * scale_y),
+                int(x2 * scale_x),
+                int(y2 * scale_y),
+            ))
 
         for i,(x1,y1,x2,y2) in enumerate(display_boxes,1):
             x1 = max(0,min(x1,orig_w-1))
